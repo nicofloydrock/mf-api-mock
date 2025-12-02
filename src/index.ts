@@ -15,6 +15,11 @@ const PORT = Number(process.env.PORT) || 5050;
 const DEFAULT_POINTS = 15;
 const INTERVAL_MS = 5000;
 
+const TRANSLATE_BASE =
+  process.env.TRANSLATE_API ?? "https://lingva.ml/api/v1";
+const TRANSLATE_SOURCE_LANG = process.env.TRANSLATE_SOURCE_LANG ?? "es";
+const TRANSLATE_TARGET_LANG = process.env.TRANSLATE_TARGET_LANG ?? "en";
+
 const ALLOWED_ORIGINS = new Set([
   "*",
   "http://localhost:5173",
@@ -22,6 +27,7 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:5001",
   "http://192.168.1.8:5001",
   "http://192.168.1.8:4173",
+  "http://192.168.1.8:5050"
 ]);
 
 const corsHeaders = (origin?: string) => {
@@ -29,7 +35,7 @@ const corsHeaders = (origin?: string) => {
   return {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Headers": "Content-Type, x-tunnel-id",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   };
 };
@@ -113,6 +119,18 @@ const getAlerts = () => {
   return raw.slice(0, 1 + Math.floor(Math.random() * raw.length));
 };
 
+const translate = async (text: string) => {
+  const targetLang = TRANSLATE_TARGET_LANG;
+  const encoded = encodeURIComponent(text);
+  const url = `${TRANSLATE_BASE}/${TRANSLATE_SOURCE_LANG}/${targetLang}/${encoded}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Lingva ${res.status}: ${res.statusText}`);
+  }
+  const data = (await res.json()) as { translation: string; info?: unknown };
+  return { lang: targetLang, translated: data.translation };
+};
+
 const send = (
   req: IncomingMessage,
   res: ServerResponse,
@@ -133,17 +151,13 @@ const router = (req: IncomingMessage, res: ServerResponse) => {
     res.writeHead(200, {
       ...headers,
       "Access-Control-Allow-Methods": "GET, OPTIONS, POST",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, x-tunnel-id",
     });
     return res.end();
   }
 
   if (!req.url) return notFound(req, res);
   const url = new URL(req.url, `http://localhost:${PORT}`);
-
-  if (req.method !== "GET") {
-    return send(req, res, 405, { error: "Method not allowed" });
-  }
 
   switch (url.pathname) {
     case "/metrics":
@@ -163,7 +177,32 @@ const router = (req: IncomingMessage, res: ServerResponse) => {
       });
     case "/alerts":
       return send(req, res, 200, { refreshedAt: Date.now(), alerts: getAlerts() });
+    case "/translate":
+      if (req.method !== "POST") {
+        return send(req, res, 405, { error: "Method not allowed" });
+      }
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+      req.on("end", async () => {
+        try {
+          const parsed = JSON.parse(body || "{}") as { text?: string };
+          if (!parsed.text) {
+            return send(req, res, 400, { error: "text is required" });
+          }
+          const result = await translate(parsed.text);
+          return send(req, res, 200, result);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return send(req, res, 500, { error: message });
+        }
+      });
+      return;
     default:
+      if (req.method !== "GET") {
+        return send(req, res, 405, { error: "Method not allowed" });
+      }
       return notFound(req, res);
   }
 };
