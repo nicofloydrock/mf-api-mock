@@ -35,7 +35,7 @@ const corsHeaders = (origin?: string) => {
   return {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": allowOrigin,
-    "Access-Control-Allow-Headers": "Content-Type, x-tunnel-id",
+    "Access-Control-Allow-Headers": "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   };
 };
@@ -158,8 +158,9 @@ const router = (req: IncomingMessage, res: ServerResponse) => {
 
   if (!req.url) return notFound(req, res);
   const url = new URL(req.url, `http://localhost:${PORT}`);
+  const pathname = url.pathname.replace(/\/+$/, "") || "/";
 
-  switch (url.pathname) {
+  switch (pathname) {
     case "/metrics":
     case "/api/metrics": {
       const pointsParam = Number(url.searchParams.get("points") ?? DEFAULT_POINTS);
