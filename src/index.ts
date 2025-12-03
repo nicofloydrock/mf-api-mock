@@ -1,5 +1,6 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { randomUUID } from "node:crypto";
+import webpush, { PushSubscription } from "web-push";
 
 type MetricPoint = { t: number; value: number };
 type MetricSeries = { id: string; label: string; points: MetricPoint[] };
@@ -19,6 +20,13 @@ const TRANSLATE_BASE =
   process.env.TRANSLATE_API ?? "https://lingva.ml/api/v1";
 const TRANSLATE_SOURCE_LANG = process.env.TRANSLATE_SOURCE_LANG ?? "es";
 const TRANSLATE_TARGET_LANG = process.env.TRANSLATE_TARGET_LANG ?? "en";
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? "mailto:example@example.com";
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
 
 const ALLOWED_ORIGINS = new Set([
   "*",
@@ -119,6 +127,20 @@ const getAlerts = () => {
   return raw.slice(0, 1 + Math.floor(Math.random() * raw.length));
 };
 
+const subscriptions: PushSubscription[] = [];
+
+const sendPush = async (payload: unknown, delaySeconds = 0) => {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+    throw new Error("VAPID keys missing in env");
+  }
+  await Promise.all(
+    subscriptions.map(async (sub) => {
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+      await webpush.sendNotification(sub, JSON.stringify(payload));
+    }),
+  );
+};
+
 const translate = async (text: string) => {
   const targetLang = TRANSLATE_TARGET_LANG;
   const encoded = encodeURIComponent(text);
@@ -178,6 +200,60 @@ const router = (req: IncomingMessage, res: ServerResponse) => {
       });
     case "/alerts":
       return send(req, res, 200, { refreshedAt: Date.now(), alerts: getAlerts() });
+    case "/push/subscribe": {
+      if (req.method !== "POST") {
+        return send(req, res, 405, { error: "Method not allowed" });
+      }
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+      req.on("end", () => {
+        try {
+          const sub = JSON.parse(body || "{}") as PushSubscription;
+          if (!sub || !sub.endpoint) {
+            return send(req, res, 400, { error: "subscription invalid" });
+          }
+          const exists = subscriptions.find((s) => s.endpoint === sub.endpoint);
+          if (!exists) subscriptions.push(sub);
+          return send(req, res, 200, { ok: true });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return send(req, res, 400, { error: message });
+        }
+      });
+      return;
+    }
+    case "/push/send": {
+      if (req.method !== "POST") {
+        return send(req, res, 405, { error: "Method not allowed" });
+      }
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+      req.on("end", async () => {
+        try {
+          const parsed = JSON.parse(body || "{}") as {
+            title?: string;
+            body?: string;
+            target?: string;
+            delaySeconds?: number;
+          };
+          const payload = {
+            title: parsed.title ?? "Push desde mock",
+            body: parsed.body ?? "Mensaje generado por api-mock",
+            target: parsed.target,
+          };
+          await sendPush(payload, parsed.delaySeconds ?? 0);
+          return send(req, res, 200, { ok: true });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return send(req, res, 500, { error: message });
+        }
+      });
+      return;
+    }
     case "/translate":
     case "/api/translate": {
       if (req.method !== "POST") {
