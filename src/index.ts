@@ -145,12 +145,18 @@ const translate = async (text: string) => {
   const targetLang = TRANSLATE_TARGET_LANG;
   const encoded = encodeURIComponent(text);
   const url = `${TRANSLATE_BASE}/${TRANSLATE_SOURCE_LANG}/${targetLang}/${encoded}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Lingva ${res.status}: ${res.statusText}`);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Lingva ${res.status}: ${res.statusText}`);
+    }
+    const data = (await res.json()) as { translation: string; info?: unknown };
+    return { lang: targetLang, translated: data.translation };
+  } catch (err) {
+    // Fallback en caso de que el servicio de traducción falle.
+    const message = err instanceof Error ? err.message : String(err);
+    return { lang: targetLang, translated: `[fallback] ${text} (${message})` };
   }
-  const data = (await res.json()) as { translation: string; info?: unknown };
-  return { lang: targetLang, translated: data.translation };
 };
 
 const send = (
