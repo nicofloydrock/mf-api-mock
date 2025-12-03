@@ -177,9 +177,9 @@ const router = (req: IncomingMessage, res: ServerResponse) => {
       });
     case "/alerts":
       return send(req, res, 200, { refreshedAt: Date.now(), alerts: getAlerts() });
-    case "/translate":
+    case "/translate": 
       if (req.method !== "POST") {
-        return send(req, res, 405, { error: "Method not allowed" });
+        return send(req, res, 405, { error: "Method not alloweddd" });
       }
       let body = "";
       req.on("data", (chunk) => {
