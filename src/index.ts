@@ -179,39 +179,27 @@ const router = (req: IncomingMessage, res: ServerResponse) => {
       return send(req, res, 200, { refreshedAt: Date.now(), alerts: getAlerts() });
     case "/translate":
     case "/api/translate": {
-      if (req.method === "GET") {
-        const textParam = url.searchParams.get("text");
-        if (!textParam) {
-          return send(req, res, 400, { error: "text is required" });
-        }
-        return translate(textParam)
-          .then((result) => send(req, res, 200, result))
-          .catch((err) => {
-            const message = err instanceof Error ? err.message : String(err);
-            return send(req, res, 500, { error: message });
-          });
+      if (req.method !== "POST") {
+        return send(req, res, 405, { error: "Method not allowed" });
       }
-      if (req.method === "POST") {
-        let body = "";
-        req.on("data", (chunk) => {
-          body += chunk.toString();
-        });
-        req.on("end", async () => {
-          try {
-            const parsed = JSON.parse(body || "{}") as { text?: string };
-            if (!parsed.text) {
-              return send(req, res, 400, { error: "text is required" });
-            }
-            const result = await translate(parsed.text);
-            return send(req, res, 200, result);
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            return send(req, res, 500, { error: message });
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+      req.on("end", async () => {
+        try {
+          const parsed = JSON.parse(body || "{}") as { text?: string };
+          if (!parsed.text) {
+            return send(req, res, 400, { error: "text is required" });
           }
-        });
-        return;
-      }
-      return send(req, res, 405, { error: "Method not allowed" });
+          const result = await translate(parsed.text);
+          return send(req, res, 200, result);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return send(req, res, 500, { error: message });
+        }
+      });
+      return;
     }
     default:
       if (req.method !== "GET") {
