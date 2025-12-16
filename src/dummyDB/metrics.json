@@ -1,0 +1,5 @@
+[
+  { "id": "traffic", "label": "Tráfico", "value": 120, "variation": 18 },
+  { "id": "conversion", "label": "Conversion", "value": 78, "variation": 9 },
+  { "id": "tickets", "label": "Tickets", "value": 42, "variation": 6 }
+]

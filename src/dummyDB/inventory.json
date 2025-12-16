@@ -1,0 +1,5 @@
+[
+  { "id": "SKU-9821", "name": "Sneaker Nova", "stockBase": 20, "stockRange": 40, "incomingMax": 10 },
+  { "id": "SKU-7310", "name": "Hoodie Nebula", "stockBase": 10, "stockRange": 20, "incomingMax": 6 },
+  { "id": "SKU-6623", "name": "Backpack Vertex", "stockBase": 4, "stockRange": 12, "incomingMax": 4 }
+]

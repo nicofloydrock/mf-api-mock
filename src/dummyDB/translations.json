@@ -1,0 +1,17 @@
+{
+  "hola": {
+    "en": "hello",
+    "fr": "bonjour",
+    "pt": "olá"
+  },
+  "buenos días": {
+    "en": "good morning",
+    "fr": "bonjour",
+    "pt": "bom dia"
+  },
+  "operador": {
+    "en": "operator",
+    "fr": "opérateur",
+    "pt": "operador"
+  }
+}

@@ -1,0 +1,5 @@
+[
+  { "id": "alert-1", "message": "Stock crítico en Backpack Vertex", "severity": "warning", "ack": false },
+  { "id": "alert-2", "message": "Nuevos arribos para Sneaker Nova", "severity": "info", "ack": false },
+  { "id": "alert-3", "message": "Incremento de tráfico > 12% en la última hora", "severity": "info", "ack": false }
+]
